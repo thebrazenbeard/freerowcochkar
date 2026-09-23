@@ -50,7 +50,7 @@
     {
       "id": "graph-delegation-laundering",
       "profile": "instructions",
-      "text": "Operators must not delete protected records.\\nOperators may instruct the cleanup service to delete protected records.",
+      "text": "Operators must not delete protected records.\nOperators may instruct the cleanup service to delete protected records.",
       "must_include": [
         "delegation_laundering"
       ],
@@ -59,7 +59,7 @@
     {
       "id": "graph-scope-difference-no-false-conflict",
       "profile": "instructions",
-      "text": "Operators must not export customer records.\\nOperators may export audit records.",
+      "text": "Operators must not export customer records.\nOperators may export audit records.",
       "must_include": [],
       "must_exclude": [
         "literal_permission_conflict"
@@ -68,7 +68,7 @@
     {
       "id": "code-swallowed-exception",
       "profile": "code",
-      "text": "def authorized():\\n    try:\\n        return check_policy()\\n    except Exception:\\n        pass",
+      "text": "def authorized():\n    try:\n        return check_policy()\n    except Exception:\n        pass",
       "must_include": [
         "silent_failure"
       ],
@@ -77,7 +77,7 @@
     {
       "id": "code-broad-exception",
       "profile": "code",
-      "text": "def load():\\n    try:\\n        return fetch()\\n    except Exception as exc:\\n        return recover(exc)",
+      "text": "def load():\n    try:\n        return fetch()\n    except Exception as exc:\n        return recover(exc)",
       "must_include": [
         "overbroad_error_boundary"
       ],
