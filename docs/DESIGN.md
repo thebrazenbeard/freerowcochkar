@@ -52,3 +52,14 @@ ingest -> normalize -> extract rules -> build constraint graph -> search adversa
 The key future primitive is a constraint graph where nodes are states or actions and edges
 are permission, obligation, prohibition, exception, precedence, fallback, or delegation.
 Loophole search then becomes path search over the reachable behavior graph.
+
+
+## Architecture package
+
+The detailed architecture is intentionally kept separate from this concise design note:
+
+- `ARCHITECTURE.md` defines the executable architecture and evidence boundaries.
+- `THREAT_MODEL.md` defines the motivated-literalist adversary and weakness classes.
+- `ROADMAP.md` defines staged implementation and acceptance targets.
+
+The source tree is expected to evolve with those contracts; architecture that exists only in chat is not project architecture.
