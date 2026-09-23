@@ -25,6 +25,12 @@ DELEGATION = re.compile(
     r"cause|causes|caused)\b",
     re.IGNORECASE,
 )
+INDIRECT_SCOPE = re.compile(
+    r"\b(indirectly|directly\s+or\s+indirectly|delegate|delegates|delegated|"
+    r"authorize|authorizes|authorized|cause|causes|caused|instruct|instructs|instructed|"
+    r"request|requests|requested|ask|asks|asked)\b",
+    re.IGNORECASE,
+)
 CONDITION = re.compile(r"\b(if|when|provided\s+that|only\s+if)\b(.+)$", re.IGNORECASE)
 EXCEPTION = re.compile(r"\b(unless|except(?:\s+when|\s+for)?|notwithstanding)\b(.+)$", re.IGNORECASE)
 WORD = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
@@ -79,7 +85,7 @@ def _parse_sentence(text: str, line: int, ordinal: int) -> Rule | None:
     condition = _capture_tail(CONDITION, tail)
     exception = _capture_tail(EXCEPTION, tail)
     core = OBJECT_TRAIL.sub("", tail).strip(" .,:;")
-    indirect = bool(DELEGATION.search(core))
+    indirect = bool(INDIRECT_SCOPE.search(core))
 
     action, obj, delegated_actor = _extract_effect(core, indirect)
     if not action:
