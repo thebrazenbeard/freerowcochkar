@@ -126,6 +126,67 @@ class ConstraintGraph:
                 )
             )
 
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "nodes": sorted(self.nodes),
+            "rules": [
+                {
+                    "rule_id": rule.rule_id,
+                    "modality": rule.modality.value,
+                    "subject": rule.subject,
+                    "action": rule.action,
+                    "object": rule.object,
+                    "effect_key": rule.effect_key,
+                    "condition": rule.condition,
+                    "exception": rule.exception,
+                    "indirect": rule.indirect,
+                    "delegated_actor": rule.delegated_actor,
+                    "confidence": rule.confidence,
+                    "source": {
+                        "line_start": rule.source.line_start,
+                        "line_end": rule.source.line_end,
+                        "text": rule.source.text,
+                    },
+                }
+                for rule in self.rules
+            ],
+            "edges": [
+                {
+                    "source": edge.source,
+                    "target": edge.target,
+                    "relation": edge.relation.value,
+                    "rule_id": edge.rule_id,
+                    "metadata": edge.metadata,
+                    "span": {
+                        "line_start": edge.span.line_start,
+                        "line_end": edge.span.line_end,
+                        "text": edge.span.text,
+                    },
+                }
+                for edge in self.edges
+            ],
+            "paths": [
+                {
+                    "path_id": path.path_id,
+                    "category": path.category,
+                    "target_effect": path.target_effect,
+                    "rule_ids": list(path.rule_ids),
+                    "confidence": path.confidence,
+                    "explanation": path.explanation,
+                    "hardening": path.hardening,
+                    "spans": [
+                        {
+                            "line_start": span.line_start,
+                            "line_end": span.line_end,
+                            "text": span.text,
+                        }
+                        for span in path.spans
+                    ],
+                }
+                for path in self.search_literal_compliance_paths()
+            ],
+        }
+
     def search_literal_compliance_paths(self) -> list[AdversarialPath]:
         paths: list[AdversarialPath] = []
         prohibited = [r for r in self.rules if r.modality == Modality.PROHIBIT]
