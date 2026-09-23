@@ -34,7 +34,7 @@ TO_ACTION = re.compile(
 )
 
 LEADING_FILLER = {
-    "directly", "indirectly", "ever", "generally", "normally", "only",
+    "directly", "indirectly", "ever", "generally", "normally", "only", "or", "and",
 }
 OBJECT_TRAIL = re.compile(
     r"\b(if|when|unless|except|provided\s+that|because|after|before|until|while)\b.*$",
