@@ -14,7 +14,7 @@ class ConstraintGraphTests(unittest.TestCase):
         self.assertEqual(Modality.PROHIBIT, rules[0].modality)
         self.assertEqual("delete", rules[0].action)
         self.assertEqual("protected records", rules[0].object)
-        self.assertEqual("delete:records", rules[0].effect_key)
+        self.assertEqual("delete:protected records", rules[0].effect_key)
         self.assertEqual(Modality.PERMIT, rules[1].modality)
 
     def test_detects_delegation_laundering_across_separate_rules(self):
@@ -42,9 +42,17 @@ class ConstraintGraphTests(unittest.TestCase):
             "Operators may instruct the cleanup service to delete protected records."
         )
         payload = ConstraintGraph.from_rules(rules).to_dict()
-        self.assertIn("effect:delete:records", payload["nodes"])
+        self.assertIn("effect:delete:protected records", payload["nodes"])
         self.assertEqual("protected records", payload["rules"][0]["object"])
         self.assertEqual("delegation_laundering", payload["paths"][0]["category"])
+
+    def test_scope_qualifiers_do_not_collapse_into_false_conflict(self):
+        rules = extract_rules(
+            "Operators must not export customer records.\n"
+            "Operators may export audit records."
+        )
+        graph = ConstraintGraph.from_rules(rules)
+        self.assertEqual([], graph.search_literal_compliance_paths())
 
     def test_detects_same_effect_permission_conflict(self):
         rules = extract_rules(
