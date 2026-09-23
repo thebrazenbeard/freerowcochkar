@@ -179,6 +179,12 @@ contract for the next implementation stages.
 
 The graph distinguishes route from effect.
 
+Normalization is deliberately conservative. Articles and possessive determiners may be
+removed, but scope-bearing qualifiers such as `protected`, `customer`, `audit`,
+`temporary`, `all`, or `any` must survive unless an explicit semantic-equivalence
+layer supplies separately labeled evidence. Aggressive normalization can manufacture
+false loopholes.
+
 For example:
 
 ```text
