@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 
 from .analyzer import analyze
+from .constraints import ConstraintGraph
+from .rules import extract_rules
 
 
 def _render_text(report) -> str:
@@ -45,7 +47,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Analysis profile.",
     )
     parser.add_argument("--intent", help="Optional plain-language intended invariant.")
-    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    parser.add_argument("--json", action="store_true", help="Emit machine-readable finding JSON.")
+    parser.add_argument(
+        "--graph-json",
+        action="store_true",
+        help="Emit extracted rules, graph edges, and adversarial paths as JSON.",
+    )
     return parser
 
 
@@ -55,6 +62,11 @@ def main(argv: list[str] | None = None) -> int:
         text = Path(args.path).read_text(encoding="utf-8")
     else:
         text = sys.stdin.read()
+
+    if args.graph_json:
+        graph = ConstraintGraph.from_rules(extract_rules(text))
+        print(json.dumps(graph.to_dict(), indent=2))
+        return 1 if graph.search_literal_compliance_paths() else 0
 
     report = analyze(text, profile=args.profile, intent=args.intent)
     if args.json:
