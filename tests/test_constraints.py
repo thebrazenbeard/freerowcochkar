@@ -36,6 +36,16 @@ class ConstraintGraphTests(unittest.TestCase):
         categories = {p.category for p in graph.search_literal_compliance_paths()}
         self.assertNotIn("delegation_laundering", categories)
 
+    def test_graph_snapshot_preserves_source_and_paths(self):
+        rules = extract_rules(
+            "Operators must not delete protected records.\n"
+            "Operators may instruct the cleanup service to delete protected records."
+        )
+        payload = ConstraintGraph.from_rules(rules).to_dict()
+        self.assertIn("effect:delete:records", payload["nodes"])
+        self.assertEqual("protected records", payload["rules"][0]["object"])
+        self.assertEqual("delegation_laundering", payload["paths"][0]["category"])
+
     def test_detects_same_effect_permission_conflict(self):
         rules = extract_rules(
             "Operators must not export customer records.\n"
