@@ -32,7 +32,8 @@ safe, ethical, or correct.
 - FRC-SCOPE-001: undefined qualifiers inside normative rules.
 - FRC-EXC-001: exception surfaces capable of swallowing base rules.
 - FRC-PREC-001: overlapping rules with conflicting polarity or permission.
-- FRC-FAIL-001: mandatory external dependency without a stated failure mode.
+- FRC-FAIL-001: mandatory external dependency without a nearby stated failure mode.
+- FRC-INDIRECT-001: direct prohibition that omits delegated or equivalent indirect effects.
 - FRC-CODE-001: swallowed exceptions.
 - FRC-CODE-002: allow-by-default or fail-open signals.
 - FRC-CODE-003: overbroad exception boundaries.
