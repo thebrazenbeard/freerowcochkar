@@ -13,7 +13,8 @@ class ConstraintGraphTests(unittest.TestCase):
         self.assertEqual(2, len(rules))
         self.assertEqual(Modality.PROHIBIT, rules[0].modality)
         self.assertEqual("delete", rules[0].action)
-        self.assertEqual("records", rules[0].object)
+        self.assertEqual("protected records", rules[0].object)
+        self.assertEqual("delete:records", rules[0].effect_key)
         self.assertEqual(Modality.PERMIT, rules[1].modality)
 
     def test_detects_delegation_laundering_across_separate_rules(self):
