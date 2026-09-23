@@ -189,7 +189,7 @@ Operators may instruct the cleanup service to delete protected records.
 Both normalize toward the effect:
 
 ```text
-effect:delete:records
+effect:delete:protected records
 ```
 
 The second rule additionally introduces a delegation route. This lets graph search reason
