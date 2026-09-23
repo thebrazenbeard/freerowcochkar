@@ -247,7 +247,7 @@ def normalize_effect(action: str, obj: str) -> str:
 def _normalize_words(value: str) -> str:
     value = value.lower().strip()
     value = re.sub(r"[^a-z0-9_ -]+", " ", value)
-    value = re.sub(r"\b(the|a|an|any|all|protected|customer|their|its|your)\b", " ", value)
+    value = re.sub(r"\b(the|a|an|their|its|your)\b", " ", value)
     value = re.sub(r"\s+", " ", value).strip()
     return value
 
