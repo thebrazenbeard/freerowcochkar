@@ -37,6 +37,17 @@ FAILURE_LANGUAGE_RE = re.compile(
     r"\b(unavailable|fails?|failure|timeout|missing|absent|unknown|fallback|retry|error)\b",
     re.IGNORECASE,
 )
+INDIRECT_SCOPE_RE = re.compile(
+    r"\b(directly\s+or\s+indirectly|indirectly|cause(?:s|d|ing)?|delegate(?:s|d|ing)?|"
+    r"on\s+(?:their|its|your)\s+behalf|through\s+(?:a|an|the)\s+"
+    r"(?:agent|tool|service|third[- ]party))\b",
+    re.IGNORECASE,
+)
+SENSITIVE_ACTION_RE = re.compile(
+    r"\b(delete|remove|merge|deploy|publish|send|disclose|export|transfer|execute|"
+    r"modify|change|grant|revoke|approve|install|activate|disable|bypass)\w*\b",
+    re.IGNORECASE,
+)
 CODE_SWALLOW_RE = re.compile(
     r"except(?:\s+Exception(?:\s+as\s+\w+)?)?\s*:\s*(?:#.*\n\s*)?pass\b",
     re.IGNORECASE,
