@@ -67,10 +67,16 @@ Add the invariant the author actually intended:
 freerowcochkar rules.md --intent "No protected effect occurs without explicit authorization"
 ~~~
 
-Machine-readable output:
+Machine-readable finding output:
 
 ~~~bash
 freerowcochkar rules.md --json
+~~~
+
+Inspect the extracted rule/constraint graph and adversarial paths:
+
+~~~bash
+freerowcochkar rules.md --graph-json
 ~~~
 
 ## Example
