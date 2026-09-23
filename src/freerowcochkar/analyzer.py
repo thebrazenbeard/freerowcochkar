@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Iterable
 
+from .constraints import ConstraintGraph
 from .models import AnalysisReport, Evidence, Finding, Severity
+from .rules import extract_rules
 
 
 NORMATIVE_RE = re.compile(
@@ -136,6 +138,7 @@ class Analyzer:
         findings.extend(self._precedence_and_collision(clauses))
         findings.extend(self._fallback_gaps(clauses))
         findings.extend(self._indirect_effect_gaps(clauses))
+        findings.extend(self._constraint_graph_findings(text))
 
         if profile in {"code", "mixed"}:
             findings.extend(self._code_findings(text))
@@ -319,6 +322,36 @@ class Analyzer:
                     "authorization, attempted circumvention, and equivalent downstream effects."
                 ),
                 confidence=0.72,
+            ))
+        return out
+
+    def _constraint_graph_findings(self, text: str) -> list[Finding]:
+        rules = extract_rules(text)
+        graph = ConstraintGraph.from_rules(rules)
+        out: list[Finding] = []
+        for path in graph.search_literal_compliance_paths():
+            evidence = tuple(
+                Evidence(span.line_start, span.line_end, span.text)
+                for span in path.spans
+            )
+            severity = (
+                Severity.HIGH
+                if path.category in {"delegation_laundering", "literal_permission_conflict"}
+                else Severity.MEDIUM
+            )
+            out.append(Finding(
+                rule_id=path.path_id,
+                category=path.category,
+                severity=severity,
+                title=f"Constraint graph exposes path to prohibited effect: {path.target_effect}",
+                evidence=evidence,
+                why_it_matters=path.explanation,
+                literalist_path=(
+                    "Compose the cited rules exactly as written so that the permitted route "
+                    "produces an effect restricted elsewhere."
+                ),
+                hardening=path.hardening,
+                confidence=path.confidence,
             ))
         return out
 
