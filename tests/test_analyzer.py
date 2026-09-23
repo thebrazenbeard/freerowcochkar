@@ -52,6 +52,14 @@ class AnalyzerTests(unittest.TestCase):
         )
         self.assertNotIn("indirect_effect_gap", {f.category for f in report.findings})
 
+    def test_public_analyzer_emits_graph_composition_finding(self):
+        text = """
+        Operators must not delete protected records.
+        Operators may instruct the cleanup service to delete protected records.
+        """
+        report = analyze(text)
+        self.assertIn("delegation_laundering", {f.category for f in report.findings})
+
     def test_code_profile_flags_swallowed_exception(self):
         text = """
 def authorized():
