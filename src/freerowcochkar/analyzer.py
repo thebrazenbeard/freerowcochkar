@@ -124,6 +124,7 @@ class Analyzer:
         findings.extend(self._unbounded_exceptions(clauses))
         findings.extend(self._precedence_and_collision(clauses))
         findings.extend(self._fallback_gaps(clauses))
+        findings.extend(self._indirect_effect_gaps(clauses))
 
         if profile in {"code", "mixed"}:
             findings.extend(self._code_findings(text))
@@ -248,31 +249,66 @@ class Analyzer:
 
     def _fallback_gaps(self, clauses: list[Clause]) -> list[Finding]:
         out: list[Finding] = []
-        whole = " ".join(c.text for c in clauses)
-        if FAILURE_LANGUAGE_RE.search(whole):
-            return out
+        for i, c in enumerate(clauses):
+            dependency = DEPENDENCY_RE.search(c.text)
+            if not (NORMATIVE_RE.search(c.text) and dependency):
+                continue
+
+            start = max(0, i - 2)
+            stop = min(len(clauses), i + 3)
+            local_context = " ".join(item.text for item in clauses[start:stop])
+            if FAILURE_LANGUAGE_RE.search(local_context):
+                continue
+
+            out.append(Finding(
+                rule_id="FRC-FAIL-001",
+                category="failure_mode_gap",
+                severity=Severity.HIGH,
+                title="Required dependency has no nearby stated failure behavior",
+                evidence=_ev(c),
+                why_it_matters=(
+                    "The rule requires an external dependency but its local rule context does not say "
+                    "what happens when that dependency cannot be used."
+                ),
+                literalist_path=(
+                    "Treat dependency failure as releasing the obligation, or substitute an "
+                    "unapproved source because the failure path is undefined."
+                ),
+                hardening=(
+                    "Specify fail-closed or fail-open behavior, permitted substitutes, retry bounds, "
+                    "and the exact status to report when the dependency is unavailable."
+                ),
+                confidence=0.86,
+            ))
+        return out
+
+    def _indirect_effect_gaps(self, clauses: list[Clause]) -> list[Finding]:
+        out: list[Finding] = []
         for c in clauses:
-            if NORMATIVE_RE.search(c.text) and DEPENDENCY_RE.search(c.text):
-                out.append(Finding(
-                    rule_id="FRC-FAIL-001",
-                    category="failure_mode_gap",
-                    severity=Severity.HIGH,
-                    title="Required dependency has no stated failure behavior",
-                    evidence=_ev(c),
-                    why_it_matters=(
-                        "The rule requires an external dependency but the document does not say what "
-                        "happens when that dependency cannot be used."
-                    ),
-                    literalist_path=(
-                        "Treat dependency failure as releasing the obligation, or substitute an "
-                        "unapproved source because the failure path is undefined."
-                    ),
-                    hardening=(
-                        "Specify fail-closed or fail-open behavior, permitted substitutes, retry bounds, "
-                        "and the exact status to report when the dependency is unavailable."
-                    ),
-                    confidence=0.84,
-                ))
+            if not (c.negative and SENSITIVE_ACTION_RE.search(c.text)):
+                continue
+            if INDIRECT_SCOPE_RE.search(c.text):
+                continue
+            out.append(Finding(
+                rule_id="FRC-INDIRECT-001",
+                category="indirect_effect_gap",
+                severity=Severity.MEDIUM,
+                title="Direct prohibition does not explicitly cover causing the same effect indirectly",
+                evidence=_ev(c),
+                why_it_matters=(
+                    "A rule can forbid an actor from performing an effect while remaining silent about "
+                    "delegating, routing, requesting, or otherwise causing that same effect."
+                ),
+                literalist_path=(
+                    "Avoid performing the prohibited action directly and instead cause another actor, "
+                    "tool, or service to produce the same outcome."
+                ),
+                hardening=(
+                    "State whether the prohibition covers direct and indirect action, delegation, requests, "
+                    "authorization, attempted circumvention, and equivalent downstream effects."
+                ),
+                confidence=0.72,
+            ))
         return out
 
     def _code_findings(self, text: str) -> list[Finding]:
