@@ -1,0 +1,355 @@
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from difflib import SequenceMatcher
+from typing import Iterable
+
+from .models import AnalysisReport, Evidence, Finding, Severity
+
+
+NORMATIVE_RE = re.compile(
+    r"\b(must(?:\s+not)?|shall(?:\s+not)?|may(?:\s+not)?|should(?:\s+not)?|"
+    r"required(?:\s+to)?|prohibited|forbidden|only\s+if|never|always|do\s+not)\b",
+    re.IGNORECASE,
+)
+NEGATIVE_RE = re.compile(
+    r"\b(must\s+not|shall\s+not|may\s+not|should\s+not|prohibited|forbidden|never|do\s+not)\b",
+    re.IGNORECASE,
+)
+PERMISSIVE_RE = re.compile(r"\b(may|can|allowed|permitted|optional)\b", re.IGNORECASE)
+EXCEPTION_RE = re.compile(
+    r"\b(unless|except(?:\s+when|\s+for)?|other\s+than|notwithstanding|save\s+for)\b",
+    re.IGNORECASE,
+)
+VAGUE_RE = re.compile(
+    r"\b(appropriate|reasonable|material|meaningful|relevant|significant|normally|"
+    r"generally|when\s+possible|if\s+possible|as\s+needed|as\s+appropriate|timely|"
+    r"substantial|sufficient|necessary)\b",
+    re.IGNORECASE,
+)
+DEPENDENCY_RE = re.compile(
+    r"\b(use|consult|read|query|call|fetch|connect\s+to|retrieve\s+from)\b.{0,50}\b"
+    r"(service|database|api|provider|repository|repo|tool|connector|server|endpoint|file)\b",
+    re.IGNORECASE,
+)
+FAILURE_LANGUAGE_RE = re.compile(
+    r"\b(unavailable|fails?|failure|timeout|missing|absent|unknown|fallback|retry|error)\b",
+    re.IGNORECASE,
+)
+CODE_SWALLOW_RE = re.compile(
+    r"except(?:\s+Exception(?:\s+as\s+\w+)?)?\s*:\s*(?:#.*\n\s*)?pass\b",
+    re.IGNORECASE,
+)
+CODE_BROAD_EXCEPT_RE = re.compile(r"except\s+Exception(?:\s+as\s+\w+)?\s*:", re.IGNORECASE)
+CODE_DEFAULT_ALLOW_RE = re.compile(
+    r"\b(default[_-]?allow|allow[_-]?all|fail[_-]?open)\b|"
+    r"except[^:]*:\s*(?:\n\s*)?return\s+True\b",
+    re.IGNORECASE,
+)
+
+STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "if", "in",
+    "is", "it", "of", "on", "or", "that", "the", "this", "to", "when", "with",
+    "must", "shall", "may", "should", "not", "do", "never", "always", "only",
+}
+
+
+@dataclass(frozen=True)
+class Clause:
+    line: int
+    text: str
+
+    @property
+    def negative(self) -> bool:
+        return bool(NEGATIVE_RE.search(self.text))
+
+    @property
+    def permissive(self) -> bool:
+        return bool(PERMISSIVE_RE.search(self.text))
+
+    @property
+    def terms(self) -> set[str]:
+        words = re.findall(r"[A-Za-z][A-Za-z0-9_-]{2,}", self.text.lower())
+        return {w for w in words if w not in STOPWORDS}
+
+
+def _clauses(text: str) -> list[Clause]:
+    out: list[Clause] = []
+    for line_no, raw in enumerate(text.splitlines(), 1):
+        raw = raw.strip()
+        if not raw:
+            continue
+        chunks = re.split(r"(?<=[.!?;])\s+", raw)
+        for chunk in chunks:
+            chunk = chunk.strip(" \t-*#>")
+            if chunk:
+                out.append(Clause(line_no, chunk))
+    return out
+
+
+def _overlap(a: Clause, b: Clause) -> float:
+    if not a.terms or not b.terms:
+        return 0.0
+    jaccard = len(a.terms & b.terms) / len(a.terms | b.terms)
+    seq = SequenceMatcher(None, " ".join(sorted(a.terms)), " ".join(sorted(b.terms))).ratio()
+    return max(jaccard, seq * 0.75)
+
+
+def _ev(clause: Clause) -> tuple[Evidence, ...]:
+    return (Evidence(clause.line, clause.line, clause.text),)
+
+
+class Analyzer:
+    """Deterministic first-pass loophole auditor.
+
+    Findings are candidates, not conclusions. The engine identifies places where
+    literal compliance may diverge from intended behavior so the rule system can
+    be hardened and regression-tested.
+    """
+
+    def analyze(
+        self,
+        text: str,
+        *,
+        profile: str = "auto",
+        intent: str | None = None,
+    ) -> AnalysisReport:
+        if profile == "auto":
+            profile = self._detect_profile(text)
+
+        clauses = _clauses(text)
+        findings: list[Finding] = []
+        findings.extend(self._ambiguous_scope(clauses))
+        findings.extend(self._unbounded_exceptions(clauses))
+        findings.extend(self._precedence_and_collision(clauses))
+        findings.extend(self._fallback_gaps(clauses))
+
+        if profile in {"code", "mixed"}:
+            findings.extend(self._code_findings(text))
+
+        findings.sort(
+            key=lambda f: (
+                {Severity.HIGH: 0, Severity.MEDIUM: 1, Severity.LOW: 2}[f.severity],
+                f.rule_id,
+            )
+        )
+        return AnalysisReport(profile=profile, findings=findings, intent=intent)
+
+    @staticmethod
+    def _detect_profile(text: str) -> str:
+        code_markers = (
+            "def ", "class ", "function ", "=>", "except ", "try:", "if (",
+            "return ", "const ", "let ", "var ", "SELECT ", "FROM ",
+        )
+        hits = sum(marker in text for marker in code_markers)
+        normative = len(NORMATIVE_RE.findall(text))
+        if hits >= 2 and normative >= 1:
+            return "mixed"
+        if hits >= 2:
+            return "code"
+        return "instructions"
+
+    def _ambiguous_scope(self, clauses: Iterable[Clause]) -> list[Finding]:
+        out: list[Finding] = []
+        for c in clauses:
+            vague = VAGUE_RE.search(c.text)
+            if NORMATIVE_RE.search(c.text) and vague:
+                term = vague.group(0)
+                out.append(Finding(
+                    rule_id="FRC-SCOPE-001",
+                    category="ambiguous_scope",
+                    severity=Severity.MEDIUM,
+                    title=f"Normative rule depends on undefined qualifier: {term!r}",
+                    evidence=_ev(c),
+                    why_it_matters=(
+                        "A mandatory or prohibitive instruction changes meaning depending on "
+                        "an undefined judgment call."
+                    ),
+                    literalist_path=(
+                        f"A literal reader can choose a favorable interpretation of {term!r} "
+                        "while claiming compliance."
+                    ),
+                    hardening=(
+                        f"Define {term!r} with observable criteria, an accountable decision-maker, "
+                        "and a fail-closed rule for borderline cases."
+                    ),
+                    confidence=0.86,
+                ))
+        return out
+
+    def _unbounded_exceptions(self, clauses: Iterable[Clause]) -> list[Finding]:
+        out: list[Finding] = []
+        for c in clauses:
+            marker = EXCEPTION_RE.search(c.text)
+            if marker and NORMATIVE_RE.search(c.text):
+                out.append(Finding(
+                    rule_id="FRC-EXC-001",
+                    category="exception_surface",
+                    severity=Severity.MEDIUM,
+                    title="Exception path can outrank the base rule",
+                    evidence=_ev(c),
+                    why_it_matters=(
+                        "Exception language creates a second path through the policy. If its scope, "
+                        "authority, or duration is not explicit, it can swallow the base rule."
+                    ),
+                    literalist_path=(
+                        f"Treat the {marker.group(0)!r} clause as the controlling path and satisfy "
+                        "its easiest literal reading."
+                    ),
+                    hardening=(
+                        "Name who may invoke the exception, enumerate qualifying conditions, define "
+                        "its duration and scope, and state which invariants remain non-waivable."
+                    ),
+                    confidence=0.78,
+                ))
+        return out
+
+    def _precedence_and_collision(self, clauses: list[Clause]) -> list[Finding]:
+        out: list[Finding] = []
+        normative = [c for c in clauses if NORMATIVE_RE.search(c.text)]
+        for i, a in enumerate(normative):
+            for b in normative[i + 1:]:
+                score = _overlap(a, b)
+                if score < 0.34:
+                    continue
+                opposed = a.negative != b.negative and (
+                    a.permissive or b.permissive or bool(NORMATIVE_RE.search(a.text)) or bool(NORMATIVE_RE.search(b.text))
+                )
+                exception_collision = (
+                    (EXCEPTION_RE.search(a.text) or EXCEPTION_RE.search(b.text))
+                    and a.negative != b.negative
+                )
+                if not (opposed or exception_collision):
+                    continue
+                out.append(Finding(
+                    rule_id="FRC-PREC-001",
+                    category="precedence_collision",
+                    severity=Severity.HIGH,
+                    title="Overlapping rules point in different directions",
+                    evidence=(
+                        Evidence(a.line, a.line, a.text),
+                        Evidence(b.line, b.line, b.text),
+                    ),
+                    why_it_matters=(
+                        "A literal actor can select the more permissive rule unless precedence is explicit."
+                    ),
+                    literalist_path=(
+                        "Cite the rule that permits the desired behavior and treat the conflicting "
+                        "restriction as lower-priority or inapplicable."
+                    ),
+                    hardening=(
+                        "State explicit precedence, narrow each rule's scope, and add a conflict rule "
+                        "for unresolved overlaps."
+                    ),
+                    confidence=min(0.96, 0.62 + score),
+                ))
+        return out
+
+    def _fallback_gaps(self, clauses: list[Clause]) -> list[Finding]:
+        out: list[Finding] = []
+        whole = " ".join(c.text for c in clauses)
+        if FAILURE_LANGUAGE_RE.search(whole):
+            return out
+        for c in clauses:
+            if NORMATIVE_RE.search(c.text) and DEPENDENCY_RE.search(c.text):
+                out.append(Finding(
+                    rule_id="FRC-FAIL-001",
+                    category="failure_mode_gap",
+                    severity=Severity.HIGH,
+                    title="Required dependency has no stated failure behavior",
+                    evidence=_ev(c),
+                    why_it_matters=(
+                        "The rule requires an external dependency but the document does not say what "
+                        "happens when that dependency cannot be used."
+                    ),
+                    literalist_path=(
+                        "Treat dependency failure as releasing the obligation, or substitute an "
+                        "unapproved source because the failure path is undefined."
+                    ),
+                    hardening=(
+                        "Specify fail-closed or fail-open behavior, permitted substitutes, retry bounds, "
+                        "and the exact status to report when the dependency is unavailable."
+                    ),
+                    confidence=0.84,
+                ))
+        return out
+
+    def _code_findings(self, text: str) -> list[Finding]:
+        out: list[Finding] = []
+        lines = text.splitlines()
+
+        def evidence_for(match: re.Match[str]) -> tuple[Evidence, ...]:
+            line = text[:match.start()].count("\n") + 1
+            snippet = lines[line - 1].strip() if line <= len(lines) else match.group(0).strip()
+            return (Evidence(line, line, snippet),)
+
+        for match in CODE_SWALLOW_RE.finditer(text):
+            out.append(Finding(
+                rule_id="FRC-CODE-001",
+                category="silent_failure",
+                severity=Severity.HIGH,
+                title="Exception is swallowed",
+                evidence=evidence_for(match),
+                why_it_matters=(
+                    "A failed invariant can be converted into apparent success or continued execution."
+                ),
+                literalist_path=(
+                    "Trigger the exceptional path and rely on the program continuing without enforcing "
+                    "the intended check."
+                ),
+                hardening=(
+                    "Catch the narrow expected exception, record it, and fail closed or return an "
+                    "explicit error state."
+                ),
+                confidence=0.95,
+            ))
+
+        for match in CODE_DEFAULT_ALLOW_RE.finditer(text):
+            out.append(Finding(
+                rule_id="FRC-CODE-002",
+                category="fail_open",
+                severity=Severity.HIGH,
+                title="Code contains an allow-by-default or fail-open signal",
+                evidence=evidence_for(match),
+                why_it_matters=(
+                    "A missing, malformed, or exceptional state may grant access instead of preserving "
+                    "the intended restriction."
+                ),
+                literalist_path=(
+                    "Reach the default or error path rather than satisfying the normal authorization path."
+                ),
+                hardening=(
+                    "Make denial the default, require explicit positive authorization, and test malformed "
+                    "and missing-state cases."
+                ),
+                confidence=0.90,
+            ))
+
+        swallowed = [m.span() for m in CODE_SWALLOW_RE.finditer(text)]
+        for match in CODE_BROAD_EXCEPT_RE.finditer(text):
+            if any(a <= match.start() <= b for a, b in swallowed):
+                continue
+            out.append(Finding(
+                rule_id="FRC-CODE-003",
+                category="overbroad_error_boundary",
+                severity=Severity.MEDIUM,
+                title="Broad exception boundary may erase distinctions between failure modes",
+                evidence=evidence_for(match),
+                why_it_matters=(
+                    "Security, validation, availability, and programmer errors can become one generic path."
+                ),
+                literalist_path=(
+                    "Cause an unexpected exception that is handled as if it were an expected recoverable case."
+                ),
+                hardening=(
+                    "Catch only expected exception types and keep authorization and validation failures "
+                    "distinct from availability failures."
+                ),
+                confidence=0.82,
+            ))
+        return out
+
+
+def analyze(text: str, *, profile: str = "auto", intent: str | None = None) -> AnalysisReport:
+    return Analyzer().analyze(text, profile=profile, intent=intent)
