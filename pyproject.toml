@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "freerowcochkar"
+version = "0.1.0"
+description = "Defensive adversarial loophole analysis for instructions, policies, specifications, and code."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "thebrazenbeard"}]
+dependencies = []
+
+[project.scripts]
+freerowcochkar = "freerowcochkar.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
