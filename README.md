@@ -27,6 +27,7 @@ Current detectors cover:
 - exceptions that can swallow a base rule;
 - overlapping instructions with conflicting permission or prohibition;
 - required external dependencies with no defined failure path;
+- prohibitions that cover direct action but omit delegated or indirect equivalents;
 - swallowed exceptions in code;
 - broad exception boundaries;
 - fail-open and allow-by-default code signals.
