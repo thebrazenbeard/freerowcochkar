@@ -29,6 +29,29 @@ class AnalyzerTests(unittest.TestCase):
         report = analyze(text)
         self.assertNotIn("failure_mode_gap", {f.category for f in report.findings})
 
+    def test_unrelated_error_word_does_not_hide_dependency_gap(self):
+        text = """
+        Errors in optional reporting should be logged.
+        The reviewer must consult the external database before approval.
+        This appendix explains unrelated formatting.
+        This appendix explains unrelated formatting.
+        This appendix explains unrelated formatting.
+        This appendix explains unrelated formatting.
+        """
+        report = analyze(text)
+        self.assertIn("failure_mode_gap", {f.category for f in report.findings})
+
+    def test_flags_indirect_effect_gap(self):
+        report = analyze("Operators must not delete protected records.")
+        self.assertIn("indirect_effect_gap", {f.category for f in report.findings})
+
+    def test_explicit_indirect_scope_closes_indirect_effect_gap(self):
+        report = analyze(
+            "Operators must not directly or indirectly delete protected records "
+            "or cause another actor to delete them."
+        )
+        self.assertNotIn("indirect_effect_gap", {f.category for f in report.findings})
+
     def test_code_profile_flags_swallowed_exception(self):
         text = """
 def authorized():
