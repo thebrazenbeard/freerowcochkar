@@ -104,4 +104,9 @@ rule text
 That is the core of the project: not merely linting words, but searching the reachable
 space between literal rules and intended outcomes.
 
-See [docs/DESIGN.md](docs/DESIGN.md) for the model.
+Architecture is committed in the repository:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system layers, graph model, evidence classes, failure model, and package boundaries.
+- [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) — the motivated-literalist adversary and protected properties.
+- [docs/ROADMAP.md](docs/ROADMAP.md) — staged path from deterministic linting to multi-step compositional search and policy/code comparison.
+- [docs/DESIGN.md](docs/DESIGN.md) — concise design rationale and detector inventory.
