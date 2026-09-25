@@ -76,6 +76,16 @@ class AnalyzerTests(unittest.TestCase):
         report = analyze(text)
         self.assertIn("delegation_laundering", {f.category for f in report.findings})
 
+    def test_detects_three_step_composition_to_forbidden_state(self):
+        text = """
+        Operators may transition release from draft to reviewed.
+        Operators may transition release from reviewed to approved.
+        Operators may transition release from approved to deployed.
+        The release state deployed is prohibited.
+        """
+        report = analyze(text)
+        self.assertIn("composition_gap", {f.category for f in report.findings})
+
     def test_code_profile_flags_swallowed_exception(self):
         text = """
 def authorized():
