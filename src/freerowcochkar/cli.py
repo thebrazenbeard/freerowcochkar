@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .analyzer import analyze
 from .constraints import ConstraintGraph
-from .rules import extract_rules
+from .rules import extract_rules, extract_state_model
 
 
 def _render_text(report) -> str:
@@ -64,7 +64,12 @@ def main(argv: list[str] | None = None) -> int:
         text = sys.stdin.read()
 
     if args.graph_json:
-        graph = ConstraintGraph.from_rules(extract_rules(text))
+        transitions, forbidden_states = extract_state_model(text)
+        graph = ConstraintGraph.from_rules(
+            extract_rules(text),
+            transitions=transitions,
+            forbidden_states=forbidden_states,
+        )
         print(json.dumps(graph.to_dict(), indent=2))
         return 1 if graph.search_literal_compliance_paths() else 0
 
