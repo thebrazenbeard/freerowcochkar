@@ -283,7 +283,7 @@ class Analyzer:
             dependency_kind = dependency.group(2).lower()
             has_matching_failure_rule = any(
                 FAILURE_LANGUAGE_RE.search(item.text)
-                and re.search(rf"\\b{re.escape(dependency_kind)}\\b", item.text, re.IGNORECASE)
+                and re.search(rf"\b{re.escape(dependency_kind)}\b", item.text, re.IGNORECASE)
                 for item in clauses[start:stop]
             )
             if has_matching_failure_rule:
