@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from .constraints import Modality, Rule, SourceSpan, normalize_effect
+from .constraints import ForbiddenState, Modality, Rule, SourceSpan, StateTransition, normalize_effect
 
 
 NEGATIVE_MODAL = re.compile(
@@ -46,6 +46,21 @@ OBJECT_TRAIL = re.compile(
     r"\b(if|when|unless|except|provided\s+that|because|after|before|until|while)\b.*$",
     re.IGNORECASE,
 )
+STATE_TRANSITION = re.compile(
+    r"^(?P<subject>.+?)\s+"
+    r"(?P<modal>must\s+not|shall\s+not|may|can|is\s+allowed\s+to|"
+    r"are\s+allowed\s+to|is\s+permitted\s+to|are\s+permitted\s+to)\s+"
+    r"transition\s+(?P<resource>[A-Za-z][A-Za-z0-9_-]*)\s+"
+    r"from\s+(?P<from_state>[A-Za-z0-9_-]+)\s+"
+    r"to\s+(?P<to_state>[A-Za-z0-9_-]+)\.?$",
+    re.IGNORECASE,
+)
+FORBIDDEN_STATE = re.compile(
+    r"^(?:the\s+)?(?P<resource>[A-Za-z][A-Za-z0-9_-]*)\s+"
+    r"state\s+(?P<state>[A-Za-z0-9_-]+)\s+"
+    r"is\s+(?:prohibited|forbidden)\.?$",
+    re.IGNORECASE,
+)
 
 
 def extract_rules(text: str) -> list[Rule]:
@@ -62,6 +77,56 @@ def extract_rules(text: str) -> list[Rule]:
             ordinal += 1
             rules.append(parsed)
     return rules
+
+
+def extract_state_model(
+    text: str,
+) -> tuple[list[StateTransition], list[ForbiddenState]]:
+    transitions: list[StateTransition] = []
+    forbidden_states: list[ForbiddenState] = []
+    transition_ordinal = 0
+    forbidden_ordinal = 0
+
+    for line_no, raw in enumerate(text.splitlines(), 1):
+        raw = raw.strip()
+        if not raw:
+            continue
+        for sentence in _sentences(raw):
+            transition_match = STATE_TRANSITION.match(sentence)
+            if transition_match:
+                transition_ordinal += 1
+                modal = transition_match.group("modal").lower()
+                modality = (
+                    Modality.PROHIBIT
+                    if "not" in modal
+                    else Modality.PERMIT
+                )
+                transitions.append(
+                    StateTransition(
+                        transition_id=f"T{transition_ordinal:04d}",
+                        modality=modality,
+                        subject=_norm_phrase(transition_match.group("subject")),
+                        resource=_norm_phrase(transition_match.group("resource")),
+                        from_state=_norm_phrase(transition_match.group("from_state")),
+                        to_state=_norm_phrase(transition_match.group("to_state")),
+                        source=SourceSpan(line_no, line_no, sentence),
+                    )
+                )
+                continue
+
+            forbidden_match = FORBIDDEN_STATE.match(sentence)
+            if forbidden_match:
+                forbidden_ordinal += 1
+                forbidden_states.append(
+                    ForbiddenState(
+                        state_id=f"S{forbidden_ordinal:04d}",
+                        resource=_norm_phrase(forbidden_match.group("resource")),
+                        state=_norm_phrase(forbidden_match.group("state")),
+                        source=SourceSpan(line_no, line_no, sentence),
+                    )
+                )
+
+    return transitions, forbidden_states
 
 
 def _sentences(raw: str) -> list[str]:
