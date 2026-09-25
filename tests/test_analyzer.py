@@ -86,6 +86,22 @@ class AnalyzerTests(unittest.TestCase):
         report = analyze(text)
         self.assertIn("composition_gap", {f.category for f in report.findings})
 
+    def test_hardening_rewrite_closes_three_step_composition(self):
+        vulnerable = """
+        Operators may transition release from draft to reviewed.
+        Operators may transition release from reviewed to approved.
+        Operators may transition release from approved to deployed.
+        The release state deployed is prohibited.
+        """
+        hardened = vulnerable.replace(
+            "Operators may transition release from approved to deployed.",
+            "Operators must not transition release from approved to deployed.",
+        )
+        before = {f.category for f in analyze(vulnerable).findings}
+        after = {f.category for f in analyze(hardened).findings}
+        self.assertIn("composition_gap", before)
+        self.assertNotIn("composition_gap", after)
+
     def test_code_profile_flags_swallowed_exception(self):
         text = """
 def authorized():
