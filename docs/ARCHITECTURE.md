@@ -161,6 +161,7 @@ Current node families:
 - `actor:<subject>`
 - `effect:<normalized effect>`
 - `route:delegate:<rule>`
+- `state:<resource>:<state>`
 
 Current edge relations:
 
@@ -206,7 +207,7 @@ about an equivalent outcome obtained through a different path.
 The graph searches for compositions where local literal compliance can reach a globally
 restricted result.
 
-V1 implements two graph path classes:
+The deterministic graph currently implements three path classes:
 
 ### FRC-PATH-DELEGATE — delegation laundering
 
@@ -218,6 +219,22 @@ production.
 
 The same actor is both permitted and prohibited to produce the same normalized effect,
 with no represented precedence rule.
+
+### FRC-PATH-COMPOSE — multi-step composition gap
+
+The state model recognizes explicit transition rules of the form
+`<subject> may transition <resource> from <state> to <state>`, matching prohibitions
+with `must not` or `shall not`, plus terminal declarations such as
+`The <resource> state <state> is prohibited`.
+
+Search is deterministic, cycle-safe, and bounded to eight transitions by default.
+A composition finding requires at least three individually permitted transitions and
+fires only when the terminal resource/state is explicitly forbidden. An exact matching
+transition prohibition removes that edge from the reachable permitted graph.
+
+The closure contract is executable: a vulnerable fixture must produce
+`FRC-PATH-COMPOSE`; after replacing at least one permissive edge with an exact
+prohibition, the same fixture must no longer produce the composition finding.
 
 Future path classes should include:
 
@@ -361,16 +378,11 @@ The desired behavior is fewer, stronger, reproducible candidates.
 
 ## Architectural frontier
 
-The next major implementation target is a multi-step state-transition graph.
+The bounded explicit state-transition graph is now implemented for deterministic
+three-or-more-step reachability into an explicitly forbidden terminal state.
 
-Instead of only matching two rules that share an effect, the engine should model:
-
-```text
-state --action/rule--> state --action/rule--> ... --> effect
-```
-
-Then it can search for a path where every edge is locally permitted but the terminal
-state violates a prohibition or declared invariant.
-
-That is the transition from a sophisticated linter to a genuine compositional loophole
-finder.
+The next frontier is richer transition semantics: parsed preconditions and postconditions,
+role or identity changes, temporal constraints, fallback and exception activation,
+explicit precedence, and eventually comparison against a separately represented declared
+invariant. Those additions must preserve the same closure property: a claimed hardening
+must remove the previously reachable path under exact regression.
