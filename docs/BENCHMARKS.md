@@ -42,7 +42,9 @@ The initial corpus covers:
 - delegation laundering across separate rules;
 - scope-preserving effect normalization;
 - swallowed exceptions;
-- broad exception handling.
+- broad exception handling;
+- three-step permitted state composition into a forbidden terminal state;
+- hardening closure by replacing a permissive transition with an exact prohibition.
 
 ## Corpus governance
 
