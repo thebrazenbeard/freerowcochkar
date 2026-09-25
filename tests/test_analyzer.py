@@ -16,6 +16,14 @@ class AnalyzerTests(unittest.TestCase):
         report = analyze(text)
         self.assertIn("precedence_collision", {f.category for f in report.findings})
 
+    def test_different_actor_scopes_do_not_create_false_precedence_collision(self):
+        text = """
+        Operators must not export customer records.
+        Supervisors may export customer records.
+        """
+        report = analyze(text)
+        self.assertNotIn("precedence_collision", {f.category for f in report.findings})
+
     def test_flags_required_dependency_without_failure_rule(self):
         text = "The reviewer must consult the external database before approval."
         report = analyze(text)
@@ -28,6 +36,14 @@ class AnalyzerTests(unittest.TestCase):
         """
         report = analyze(text)
         self.assertNotIn("failure_mode_gap", {f.category for f in report.findings})
+
+    def test_unrelated_nearby_failure_does_not_hide_dependency_gap(self):
+        text = """
+        If the logging service fails, retry it.
+        The reviewer must consult the external database before approval.
+        """
+        report = analyze(text)
+        self.assertIn("failure_mode_gap", {f.category for f in report.findings})
 
     def test_unrelated_error_word_does_not_hide_dependency_gap(self):
         text = """
@@ -59,6 +75,32 @@ class AnalyzerTests(unittest.TestCase):
         """
         report = analyze(text)
         self.assertIn("delegation_laundering", {f.category for f in report.findings})
+
+    def test_detects_three_step_composition_to_forbidden_state(self):
+        text = """
+        Operators may transition release from draft to reviewed.
+        Operators may transition release from reviewed to approved.
+        Operators may transition release from approved to deployed.
+        The release state deployed is prohibited.
+        """
+        report = analyze(text)
+        self.assertIn("composition_gap", {f.category for f in report.findings})
+
+    def test_hardening_rewrite_closes_three_step_composition(self):
+        vulnerable = """
+        Operators may transition release from draft to reviewed.
+        Operators may transition release from reviewed to approved.
+        Operators may transition release from approved to deployed.
+        The release state deployed is prohibited.
+        """
+        hardened = vulnerable.replace(
+            "Operators may transition release from approved to deployed.",
+            "Operators must not transition release from approved to deployed.",
+        )
+        before = {f.category for f in analyze(vulnerable).findings}
+        after = {f.category for f in analyze(hardened).findings}
+        self.assertIn("composition_gap", before)
+        self.assertNotIn("composition_gap", after)
 
     def test_code_profile_flags_swallowed_exception(self):
         text = """

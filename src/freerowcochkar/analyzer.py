@@ -7,7 +7,7 @@ from typing import Iterable
 
 from .constraints import ConstraintGraph
 from .models import AnalysisReport, Evidence, Finding, Severity
-from .rules import extract_rules
+from .rules import extract_rules, extract_state_model
 
 
 NORMATIVE_RE = re.compile(
@@ -223,8 +223,18 @@ class Analyzer:
     def _precedence_and_collision(self, clauses: list[Clause]) -> list[Finding]:
         out: list[Finding] = []
         normative = [c for c in clauses if NORMATIVE_RE.search(c.text)]
+
+        def subject_for(clause: Clause) -> str | None:
+            parsed = extract_rules(clause.text)
+            return parsed[0].subject if len(parsed) == 1 else None
+
         for i, a in enumerate(normative):
             for b in normative[i + 1:]:
+                subject_a = subject_for(a)
+                subject_b = subject_for(b)
+                if subject_a is not None and subject_b is not None and subject_a != subject_b:
+                    continue
+
                 score = _overlap(a, b)
                 if score < 0.34:
                     continue
@@ -270,8 +280,13 @@ class Analyzer:
 
             start = max(0, i - 2)
             stop = min(len(clauses), i + 3)
-            local_context = " ".join(item.text for item in clauses[start:stop])
-            if FAILURE_LANGUAGE_RE.search(local_context):
+            dependency_kind = dependency.group(2).lower()
+            has_matching_failure_rule = any(
+                FAILURE_LANGUAGE_RE.search(item.text)
+                and re.search(rf"\b{re.escape(dependency_kind)}\b", item.text, re.IGNORECASE)
+                for item in clauses[start:stop]
+            )
+            if has_matching_failure_rule:
                 continue
 
             out.append(Finding(
@@ -327,7 +342,12 @@ class Analyzer:
 
     def _constraint_graph_findings(self, text: str) -> list[Finding]:
         rules = extract_rules(text)
-        graph = ConstraintGraph.from_rules(rules)
+        transitions, forbidden_states = extract_state_model(text)
+        graph = ConstraintGraph.from_rules(
+            rules,
+            transitions=transitions,
+            forbidden_states=forbidden_states,
+        )
         out: list[Finding] = []
         for path in graph.search_literal_compliance_paths():
             evidence = tuple(
@@ -336,7 +356,11 @@ class Analyzer:
             )
             severity = (
                 Severity.HIGH
-                if path.category in {"delegation_laundering", "literal_permission_conflict"}
+                if path.category in {
+                    "delegation_laundering",
+                    "literal_permission_conflict",
+                    "composition_gap",
+                }
                 else Severity.MEDIUM
             )
             out.append(Finding(

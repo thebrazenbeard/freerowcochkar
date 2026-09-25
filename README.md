@@ -17,7 +17,7 @@ That question applies to legal and policy text, AI or human instructions, softwa
 specifications, code, configuration, authorization systems, operating procedures, and
 compliance controls.
 
-## What V1 does
+## What the deterministic core does
 
 The first implementation is deterministic and dependency-free. It reports candidate
 loopholes with exact evidence, an adversarial literal-reading path, and a hardening
@@ -32,7 +32,9 @@ Current detectors cover:
 - prohibitions that cover direct action but omit delegated or indirect equivalents;
 - swallowed exceptions in code;
 - broad exception boundaries;
-- fail-open and allow-by-default code signals.
+- fail-open and allow-by-default code signals;
+- three-or-more-step permitted state-transition chains that terminate in an explicitly
+  forbidden state, with cycle-safe bounded search and regression-proven closure.
 
 This is intentionally an auditor, not an oracle. A finding means "inspect this boundary,"
 not "this is definitely exploitable" and not "this behavior is lawful."
@@ -97,20 +99,24 @@ what scope, and which invariant remains non-waivable?
 
 ## Direction
 
-V1 uses reproducible heuristics. The next major layer is a typed constraint graph:
+The deterministic core now includes typed rules, a constraint graph, and a bounded
+multi-step state-transition search:
 
 ~~~text
 rule text
-  -> obligations / permissions / prohibitions / exceptions / delegation
+  -> obligations / permissions / prohibitions / transitions
   -> state-and-action graph
-  -> adversarial path search
+  -> bounded adversarial path search
   -> evidence-bound loophole candidate
-  -> hardening patch
-  -> regression case proving the patch closes the path
+  -> hardening rewrite
+  -> regression case proving the path closes
 ~~~
 
-That is the core of the project: not merely linting words, but searching the reachable
-space between literal rules and intended outcomes.
+The current Stage-2 grammar is deliberately explicit rather than semantic: it recognizes
+state-transition sentences and forbidden terminal states without guessing equivalence.
+The next work is to enrich transition semantics with preconditions, role changes,
+temporal constraints, fallback/exception activation, and explicit precedence while
+preserving deterministic provenance.
 
 Architecture is committed in the repository:
 
