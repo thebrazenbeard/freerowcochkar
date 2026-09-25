@@ -26,23 +26,32 @@ covers positive and closure cases.
 
 ## Stage 2 — multi-step composition engine
 
-Build a state-transition representation where a path can contain more than two rules.
+Status: core exit condition implemented; richer transition semantics remain.
 
-Required capabilities:
+Implemented core:
 
-- preconditions;
-- postconditions;
-- role/identity transitions;
-- state mutation;
+- explicit resource/state transitions;
+- permitted and prohibited transition edges;
+- explicit forbidden terminal states;
+- at-least-three-step composition detection;
+- configurable path-length bound;
+- cycle-safe simple-path traversal;
+- exact-edge hardening closure proof;
+- analyzer and graph-JSON integration;
+- positive and closure regression fixtures.
+
+Remaining Stage-2 expansion:
+
+- parsed preconditions and postconditions;
+- role/identity transitions as state;
 - temporal constraints;
 - fallback transitions;
 - exception activation;
-- explicit precedence;
-- path length bounds;
-- cycle detection.
+- explicit graph precedence.
 
-Exit condition: detect a loophole that requires at least three individually permitted
-steps and prove that adding one hardening rule closes that path.
+Core exit condition: satisfied. The engine detects a loophole requiring at least three
+individually permitted steps and the regression suite proves that replacing one permissive
+edge with an exact prohibition closes that path.
 
 ## Stage 3 — source-aware parsers
 
