@@ -82,6 +82,15 @@
         "overbroad_error_boundary"
       ],
       "must_exclude": []
+    },
+    {
+      "id": "instruction-unrelated-nearby-failure",
+      "profile": "instructions",
+      "text": "If the logging service fails, retry it.\\nThe reviewer must consult the external database before approval.",
+      "must_include": [
+        "failure_mode_gap"
+      ],
+      "must_exclude": []
     }
   ]
-}
+}\n
