@@ -7,7 +7,7 @@ from typing import Iterable
 
 from .constraints import ConstraintGraph
 from .models import AnalysisReport, Evidence, Finding, Severity
-from .rules import extract_rules
+from .rules import extract_rules, extract_state_model
 
 
 NORMATIVE_RE = re.compile(
@@ -342,7 +342,12 @@ class Analyzer:
 
     def _constraint_graph_findings(self, text: str) -> list[Finding]:
         rules = extract_rules(text)
-        graph = ConstraintGraph.from_rules(rules)
+        transitions, forbidden_states = extract_state_model(text)
+        graph = ConstraintGraph.from_rules(
+            rules,
+            transitions=transitions,
+            forbidden_states=forbidden_states,
+        )
         out: list[Finding] = []
         for path in graph.search_literal_compliance_paths():
             evidence = tuple(
@@ -351,7 +356,11 @@ class Analyzer:
             )
             severity = (
                 Severity.HIGH
-                if path.category in {"delegation_laundering", "literal_permission_conflict"}
+                if path.category in {
+                    "delegation_laundering",
+                    "literal_permission_conflict",
+                    "composition_gap",
+                }
                 else Severity.MEDIUM
             )
             out.append(Finding(
