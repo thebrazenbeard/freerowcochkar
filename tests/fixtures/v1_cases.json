@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "description": "Deterministic adversarial regression corpus for FreeRowCochkar V1.",
+  "cases": [
+    {
+      "id": "instruction-vague-qualifier",
+      "profile": "instructions",
+      "text": "The operator must take reasonable steps before release.",
+      "must_include": [
+        "ambiguous_scope"
+      ],
+      "must_exclude": []
+    },
+    {
+      "id": "instruction-dependency-failure-gap",
+      "profile": "instructions",
+      "text": "The reviewer must consult the external database before approval.",
+      "must_include": [
+        "failure_mode_gap"
+      ],
+      "must_exclude": []
+    },
+    {
+      "id": "instruction-explicit-failure-closed",
+      "profile": "instructions",
+      "text": "The reviewer must consult the external database before approval. If the database is unavailable, approval must stop and status is UNKNOWN.",
+      "must_include": [],
+      "must_exclude": [
+        "failure_mode_gap"
+      ]
+    },
+    {
+      "id": "instruction-direct-delete-gap",
+      "profile": "instructions",
+      "text": "Operators must not delete protected records.",
+      "must_include": [
+        "indirect_effect_gap"
+      ],
+      "must_exclude": []
+    },
+    {
+      "id": "instruction-direct-and-indirect-closed",
+      "profile": "instructions",
+      "text": "Operators must not directly or indirectly delete protected records or cause another actor to delete them.",
+      "must_include": [],
+      "must_exclude": [
+        "indirect_effect_gap"
+      ]
+    },
+    {
+      "id": "graph-delegation-laundering",
+      "profile": "instructions",
+      "text": "Operators must not delete protected records.\nOperators may instruct the cleanup service to delete protected records.",
+      "must_include": [
+        "delegation_laundering"
+      ],
+      "must_exclude": []
+    },
+    {
+      "id": "graph-scope-difference-no-false-conflict",
+      "profile": "instructions",
+      "text": "Operators must not export customer records.\nOperators may export audit records.",
+      "must_include": [],
+      "must_exclude": [
+        "literal_permission_conflict"
+      ]
+    },
+    {
+      "id": "code-swallowed-exception",
+      "profile": "code",
+      "text": "def authorized():\n    try:\n        return check_policy()\n    except Exception:\n        pass",
+      "must_include": [
+        "silent_failure"
+      ],
+      "must_exclude": []
+    },
+    {
+      "id": "code-broad-exception",
+      "profile": "code",
+      "text": "def load():\n    try:\n        return fetch()\n    except Exception as exc:\n        return recover(exc)",
+      "must_include": [
+        "overbroad_error_boundary"
+      ],
+      "must_exclude": []
+    }
+  ]
+}
