@@ -39,6 +39,6 @@
 ### Task 4: Exact-head verification and documentation
 
 - [x] Update architecture, roadmap, benchmarks, and README.
-- [ ] Run full unittest suite at exact head.
-- [ ] Run git diff origin/main...HEAD --check.
-- [ ] Verify graph-json output and exact branch/PR head.
+- [x] Run full unittest suite at exact head.
+- [x] Run git diff origin/main...HEAD --check.
+- [x] Verify graph-json output and exact branch/PR head.
