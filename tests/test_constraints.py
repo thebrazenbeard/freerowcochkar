@@ -1,7 +1,7 @@
 import unittest
 
 from freerowcochkar.constraints import ConstraintGraph, Modality
-from freerowcochkar.rules import extract_rules
+from freerowcochkar.rules import extract_rules, extract_state_model
 
 
 class ConstraintGraphTests(unittest.TestCase):
@@ -64,6 +64,108 @@ class ConstraintGraphTests(unittest.TestCase):
             "literal_permission_conflict",
             {p.category for p in graph.search_literal_compliance_paths()},
         )
+
+
+    def test_extracts_state_transition_model(self):
+        text = (
+            "Operators may transition release from draft to reviewed.\n"
+            "Operators must not transition release from approved to deployed.\n"
+            "The release state deployed is prohibited."
+        )
+        transitions, forbidden_states = extract_state_model(text)
+        self.assertEqual(2, len(transitions))
+        self.assertEqual(Modality.PERMIT, transitions[0].modality)
+        self.assertEqual(Modality.PROHIBIT, transitions[1].modality)
+        self.assertEqual(
+            ("release", "draft", "reviewed"),
+            (
+                transitions[0].resource,
+                transitions[0].from_state,
+                transitions[0].to_state,
+            ),
+        )
+        self.assertEqual(1, len(forbidden_states))
+        self.assertEqual("deployed", forbidden_states[0].state)
+
+    def test_three_step_composition_reaches_forbidden_state(self):
+        text = (
+            "Operators may transition release from draft to reviewed.\n"
+            "Operators may transition release from reviewed to approved.\n"
+            "Operators may transition release from approved to deployed.\n"
+            "The release state deployed is prohibited."
+        )
+        transitions, forbidden_states = extract_state_model(text)
+        graph = ConstraintGraph.from_rules(
+            extract_rules(text),
+            transitions=transitions,
+            forbidden_states=forbidden_states,
+        )
+        composition = [
+            path
+            for path in graph.search_literal_compliance_paths()
+            if path.category == "composition_gap"
+        ]
+        self.assertEqual(1, len(composition))
+        self.assertEqual(
+            ("T0001", "T0002", "T0003", "S0001"),
+            composition[0].rule_ids,
+        )
+
+    def test_two_step_path_does_not_trigger_composition(self):
+        text = (
+            "Operators may transition release from draft to approved.\n"
+            "Operators may transition release from approved to deployed.\n"
+            "The release state deployed is prohibited."
+        )
+        transitions, forbidden_states = extract_state_model(text)
+        graph = ConstraintGraph.from_rules(
+            extract_rules(text),
+            transitions=transitions,
+            forbidden_states=forbidden_states,
+        )
+        categories = {
+            path.category for path in graph.search_literal_compliance_paths()
+        }
+        self.assertNotIn("composition_gap", categories)
+
+    def test_transition_prohibition_rewrite_closes_composition_path(self):
+        text = (
+            "Operators may transition release from draft to reviewed.\n"
+            "Operators may transition release from reviewed to approved.\n"
+            "Operators must not transition release from approved to deployed.\n"
+            "The release state deployed is prohibited."
+        )
+        transitions, forbidden_states = extract_state_model(text)
+        graph = ConstraintGraph.from_rules(
+            extract_rules(text),
+            transitions=transitions,
+            forbidden_states=forbidden_states,
+        )
+        categories = {
+            path.category for path in graph.search_literal_compliance_paths()
+        }
+        self.assertNotIn("composition_gap", categories)
+
+    def test_cycle_does_not_create_unbounded_composition(self):
+        text = (
+            "Operators may transition release from draft to reviewed.\n"
+            "Operators may transition release from reviewed to draft.\n"
+            "The release state deployed is prohibited."
+        )
+        transitions, forbidden_states = extract_state_model(text)
+        graph = ConstraintGraph.from_rules(
+            extract_rules(text),
+            transitions=transitions,
+            forbidden_states=forbidden_states,
+        )
+        composition = [
+            path
+            for path in graph.search_literal_compliance_paths(
+                max_transition_depth=32
+            )
+            if path.category == "composition_gap"
+        ]
+        self.assertEqual([], composition)
 
 
 if __name__ == "__main__":
