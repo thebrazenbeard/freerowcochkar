@@ -16,6 +16,14 @@ class AnalyzerTests(unittest.TestCase):
         report = analyze(text)
         self.assertIn("precedence_collision", {f.category for f in report.findings})
 
+    def test_different_actor_scopes_do_not_create_false_precedence_collision(self):
+        text = """
+        Operators must not export customer records.
+        Supervisors may export customer records.
+        """
+        report = analyze(text)
+        self.assertNotIn("precedence_collision", {f.category for f in report.findings})
+
     def test_flags_required_dependency_without_failure_rule(self):
         text = "The reviewer must consult the external database before approval."
         report = analyze(text)
