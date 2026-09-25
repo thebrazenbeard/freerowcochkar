@@ -223,8 +223,18 @@ class Analyzer:
     def _precedence_and_collision(self, clauses: list[Clause]) -> list[Finding]:
         out: list[Finding] = []
         normative = [c for c in clauses if NORMATIVE_RE.search(c.text)]
+
+        def subject_for(clause: Clause) -> str | None:
+            parsed = extract_rules(clause.text)
+            return parsed[0].subject if len(parsed) == 1 else None
+
         for i, a in enumerate(normative):
             for b in normative[i + 1:]:
+                subject_a = subject_for(a)
+                subject_b = subject_for(b)
+                if subject_a is not None and subject_b is not None and subject_a != subject_b:
+                    continue
+
                 score = _overlap(a, b)
                 if score < 0.34:
                     continue
