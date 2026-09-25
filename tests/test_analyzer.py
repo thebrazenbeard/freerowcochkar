@@ -37,6 +37,14 @@ class AnalyzerTests(unittest.TestCase):
         report = analyze(text)
         self.assertNotIn("failure_mode_gap", {f.category for f in report.findings})
 
+    def test_unrelated_nearby_failure_does_not_hide_dependency_gap(self):
+        text = """
+        If the logging service fails, retry it.
+        The reviewer must consult the external database before approval.
+        """
+        report = analyze(text)
+        self.assertIn("failure_mode_gap", {f.category for f in report.findings})
+
     def test_unrelated_error_word_does_not_hide_dependency_gap(self):
         text = """
         Errors in optional reporting should be logged.
