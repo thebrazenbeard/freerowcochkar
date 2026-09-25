@@ -91,6 +91,24 @@
         "failure_mode_gap"
       ],
       "must_exclude": []
+    },
+    {
+      "id": "graph-three-step-composition",
+      "profile": "instructions",
+      "text": "Operators may transition release from draft to reviewed.\nOperators may transition release from reviewed to approved.\nOperators may transition release from approved to deployed.\nThe release state deployed is prohibited.",
+      "must_include": [
+        "composition_gap"
+      ],
+      "must_exclude": []
+    },
+    {
+      "id": "graph-three-step-composition-hardened",
+      "profile": "instructions",
+      "text": "Operators may transition release from draft to reviewed.\nOperators may transition release from reviewed to approved.\nOperators must not transition release from approved to deployed.\nThe release state deployed is prohibited.",
+      "must_include": [],
+      "must_exclude": [
+        "composition_gap"
+      ]
     }
   ]
 }
