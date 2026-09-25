@@ -280,8 +280,13 @@ class Analyzer:
 
             start = max(0, i - 2)
             stop = min(len(clauses), i + 3)
-            local_context = " ".join(item.text for item in clauses[start:stop])
-            if FAILURE_LANGUAGE_RE.search(local_context):
+            dependency_kind = dependency.group(2).lower()
+            has_matching_failure_rule = any(
+                FAILURE_LANGUAGE_RE.search(item.text)
+                and re.search(rf"\\b{re.escape(dependency_kind)}\\b", item.text, re.IGNORECASE)
+                for item in clauses[start:stop]
+            )
+            if has_matching_failure_rule:
                 continue
 
             out.append(Finding(
